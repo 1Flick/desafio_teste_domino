@@ -1,0 +1,52 @@
+{
+  "tests/compra.spec.js": {
+    "assinatura": {
+      "imports": "dbc96277ef0a7ca1b8c0eca5a2777349c1c0adbe31d2e3d2b3365c9cf39531ac",
+      "declaracoes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "execucoes": "fecbd5578fceb8e7cc7cf4086770de637b905a8ab295270283aed90fd78825e9"
+    },
+    "fixture": null,
+    "assercoesExtraidas": 16,
+    "preparacoesExtraidas": 0
+  },
+  "tests/dicas.spec.js": {
+    "assinatura": {
+      "imports": "0d943075c0db2b2bd6590ea95f8c634c49f2517098f0fb3a285cf8ec766366b6",
+      "declaracoes": "40b93dc7f0c001ada4fcf212834ac1cdbad14f737c7619c848fadc7114ea9e03",
+      "execucoes": "bf0a93979de23f987be8507e74fb8379e0ae81ccb680ec3b88de642f7529fff2"
+    },
+    "fixture": "tests/cenarios/dicas.js",
+    "assercoesExtraidas": 3,
+    "preparacoesExtraidas": 0
+  },
+  "tests/distribuicao.spec.js": {
+    "assinatura": {
+      "imports": "3f9b5be412d669b9b80ca6ffbaf4ca65f32d84ccd604a59322bb08a8089aea23",
+      "declaracoes": "1b9d3da38abf1b3e393dc8eb62f2ab4f7c7032a95ad133fcc244eceb88149974",
+      "execucoes": "687ea6cacf1d5c10d71293c83367b20b12fd1e89a44e7c08caee4a72f413b724"
+    },
+    "fixture": "tests/cenarios/distribuicao.js",
+    "assercoesExtraidas": 20,
+    "preparacoesExtraidas": 1
+  },
+  "tests/fim-de-jogo.spec.js": {
+    "assinatura": {
+      "imports": "1c4af99edfc60f1e66e06c9effc06b0f0a9c9451e62feb55a07aa89c9bfa2609",
+      "declaracoes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "execucoes": "d39719fef611d93a3a8db7311a2b4eaa00fd20a5616d44a4eff0f9c24c6174ce"
+    },
+    "fixture": null,
+    "assercoesExtraidas": 13,
+    "preparacoesExtraidas": 0
+  },
+  "tests/jogadas.spec.js": {
+    "assinatura": {
+      "imports": "126057aa8b09c1ed6b09cc140f19b1548e50e40ee6943a5fd863e5e92750df66",
+      "declaracoes": "6c9ee4e41323e78bb96483ee1a69bc0aabee2d11a2e8da2c7de77f20674550f5",
+      "execucoes": "4d663e1d17524049f166fa19fcc026d23d867265a2f9320e6c33dbde6e07480c"
+    },
+    "fixture": "tests/cenarios/jogadas.js",
+    "assercoesExtraidas": 18,
+    "preparacoesExtraidas": 0
+  }
+}
