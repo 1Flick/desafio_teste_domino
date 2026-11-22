@@ -1,0 +1,262 @@
+# Planejamento — desafio_teste_domino
+
+Partida de dominó para **2 jogadores**: **casos de teste de interface em JavaScript**. O jogo em si não é implementado por enquanto (fase GREEN desativada); os testes ficam falhando pelo motivo certo.
+
+Esta versão preserva os casos de teste da base fornecida.
+
+---
+
+## 1. Regras do jogo (o que os testes verificam)
+
+- **28 peças** (duplo-seis): todas as combinações de 0 a 6, de `0-0` a `6-6`. Soma de todos os pontos = 168.
+- **2 jogadores** no mesmo computador (J1 e J2). Só a mão do jogador da vez fica virada para cima.
+- **Distribuição:** 7 peças para cada um; as 14 restantes formam o **monte** (para compra).
+- **Quem começa:** quem tiver a **maior dupla** (6-6, senão 5-5, …) e é obrigado a jogá-la. Se ninguém tiver dupla, começa quem tiver a peça de maior soma, jogando essa peça.
+- **Jogar:** a peça precisa ter um dos números das **pontas** da mesa. Ela é girada automaticamente para encaixar. Se encaixar nas duas pontas, o jogador escolhe o lado. Se as duas pontas têm o **mesmo número** (por exemplo, só o 6-6 na mesa), a peça entra à **direita** sem perguntar.
+- **Comprar:** só pode comprar quem não tem nenhuma peça que encaixe. Compra uma por vez, até ter uma jogável ou o monte acabar.
+- **Passar:** só quando não tem peça jogável **e** o monte está vazio.
+- A vez alterna depois de cada jogada ou passe.
+- **Batida:** quem jogar a última peça da mão vence e marca a soma dos pontos que sobraram na mão do adversário.
+- **Jogo trancado:** monte vazio e nenhum dos dois consegue jogar. Vence quem tem **menos pontos** na mão e marca a soma da mão do adversário. Somas iguais → **empate**.
+- **Dicas:** na mão do jogador da vez, as peças que podem ser jogadas têm `data-jogavel="true"`. Sem nenhuma, `btn-comprar` ganha `data-sugerido="true"`.
+
+## 2. Stack, comandos e estrutura
+
+| Item | Escolha |
+|---|---|
+| Entrega atual | **Somente os casos de teste** (`tests/`). O código do jogo não é implementado até segunda ordem |
+| Executor dos testes | [Jest](https://jestjs.io) 29, com `babel-jest` (converte os ES Modules para CommonJS só nos testes) |
+| Testes de interface | [Testing Library](https://testing-library.com) (`@testing-library/dom` + `@testing-library/user-event` + `@testing-library/jest-dom`), em JavaScript |
+| "Navegador" dos testes | [jsdom](https://github.com/jsdom/jsdom) (`testEnvironment: 'jsdom'` no `package.json`, via `jest-environment-jsdom`). Não precisa baixar navegador |
+| Esqueleto da tela | `index.html` com os elementos da seção 3 **vazios** + `js/main.js` vazio. É só o "molde" que os testes abrem |
+| Node | 18 ou superior |
+| CI | GitHub Actions rodando `npm ci` e `npm run verificar` em todo push e Pull Request |
+
+Dependências de desenvolvimento (tarefa G1): `jest`, `jest-environment-jsdom`, `babel-jest`, `@babel/core`, `@babel/preset-env`, `@testing-library/dom`, `@testing-library/user-event`, `@testing-library/jest-dom`.
+
+Comandos que o projeto deve ter (`package.json` da tarefa G1):
+
+```bash
+npm install                 # instala dependências (não baixa navegador)
+npm test                    # roda os testes (jest) — por enquanto TODOS falham, de propósito
+npm run verificar           # confere se cada teste falha pelo motivo certo e tem um ID do plano
+npm run verificar:completo  # idem + acusa TCs do plano que ainda não têm teste (usar na entrega)
+```
+
+```json
+"scripts": {
+  "test": "jest",
+  "verificar": "node scripts/verificar-testes.mjs",
+  "verificar:completo": "node scripts/verificar-testes.mjs --completo"
+}
+```
+
+### Por que os testes ficam falhando
+
+A fase GREEN (implementar o jogo) está **desativada até segunda ordem**. Então cada teste é escrito a partir da especificação (seções 1, 3 e 5) e precisa **falhar pelo motivo certo**:
+
+- ✅ **Motivo certo:** a asserção não bate ou o elemento não existe, porque o jogo ainda não faz aquilo. Por exemplo, `AssertionError`, `Unable to find an element by: [data-testid="carta-j1-0"]` ou `expect(element).toHaveTextContent()`.
+- ❌ **Motivo errado:** erro no próprio teste, como `TypeError`, `ReferenceError`, import quebrado ou arquivo que não carrega.
+- ❌ **Teste passando:** se passa com a tela vazia, ele não testa nada. Reescreva-o para conferir o comportamento da seção 5.
+
+O `scripts/verificar-testes.mjs` (já no repositório) faz essa conferência sozinho; o CI e o hook dos agentes usam ele.
+
+### Esqueleto da tela (`index.html`, tarefa G1)
+
+- Tem os elementos **fixos** da seção 3, cada um com seu `data-testid`, **sem texto, sem valor e sem atributos de estado** (`data-estado`, `disabled`, `hidden`). Senão algum teste passaria sem o jogo existir.
+- Elementos criados pelo jogo (células, cartas, peças, casas) **não** entram no esqueleto.
+- Carrega `<script type="module" src="js/main.js"></script>`; `js/main.js` fica só com um comentário até a fase GREEN.
+
+### Como um teste abre o jogo — `tests/helpers.js` (tarefa G1)
+
+```js
+// tests/helpers.js
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
+
+// Caminho a partir da raiz (no ambiente jsdom, `new URL(..., import.meta.url)` não funciona com o fs).
+const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+const corpo = html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
+
+export async function abrirJogo(params = {}, opcoesUser = {}) {
+  window.history.replaceState({}, '', '/?' + new URLSearchParams(params)); // parâmetros da seção 3
+  document.body.innerHTML = corpo;          // mesmo HTML do jogo
+  jest.resetModules();                        // cada teste começa um jogo novo
+  await import('../js/main.js');            // vazio por enquanto; na fase GREEN, inicia o jogo
+  return userEvent.setup(opcoesUser);       // "user" para clicar como um jogador
+}
+```
+
+Exemplo de caso de teste:
+
+```js
+import { screen } from '@testing-library/dom';
+import { abrirJogo } from './helpers.js';
+
+test('TC-XX-01 exemplo', async () => {
+  const user = await abrirJogo({ /* parâmetros */ });
+  await user.click(screen.getByTestId('btn-nova-partida'));
+  expect(screen.getByTestId('mensagem')).toHaveTextContent('...');
+});
+```
+
+### Regras para os testes
+
+- Os testes **só** acessam o jogo pelo que o usuário vê/clica: `screen.getByTestId(...)`, `getByRole(...)` e `user.click`, `user.dblClick`, `user.pointer(...)`. Nada de importar `js/*.js` ou chamar funções internas.
+- Clique direito: `await user.pointer({ keys: '[MouseRight]', target: elemento })`. Clique duplo: `await user.dblClick(elemento)`.
+- O jsdom **não lê CSS**. Esconder/mostrar se confere pelo atributo `hidden` (`toBeVisible()`); bloqueio, pelo `disabled` (`toBeDisabled()`).
+- Tempo (cronômetro): `jest.useFakeTimers()` no teste, `abrirJogo(params, { advanceTimers: jest.advanceTimersByTime })` e `jest.advanceTimersByTime(2000)` para "esperar" 2 s sem esperar de verdade.
+- Todo elemento que um teste usa tem `data-testid` (lista na seção 3). Se precisar de um novo, adicione na seção 3 no mesmo PR.
+- Aleatoriedade é controlada por **parâmetros de URL** (seção 3). Um teste nunca depende de sorte.
+- Cada caso de teste da seção 5 vira um `test('TC-XX-NN ...')` com o **mesmo ID no título** (o verificador exige).
+- Proibido `test.skip`, `test.todo` e `.only` (o verificador acusa).
+
+Estrutura de pastas e dono de cada arquivo.
+
+> ⚠️ Os arquivos de `js/` (fora o `main.js` vazio) e o `css/` são da **fase GREEN, desativada até segunda ordem**: ninguém os cria agora. A divisão fica pronta para quando ela for liberada.
+
+```
+desafio_teste_domino/
+├── index.html              G1  esqueleto: elementos fixos da seção 3, vazios
+├── js/main.js              G1  vazio (na fase GREEN: lê a URL e inicia o jogo)
+├── js/pecas.js             Grupo G  28 peças, embaralhar, distribuir
+├── js/mesa.js              Grupo G  pontas, encaixar, girar, escolher lado
+├── js/jogo.js              Grupo G  quem começa, turnos
+├── js/ui-mesa.js           Grupo G  desenha mãos e mesa
+├── js/compra.js            Grupo B    comprar, passar
+├── js/fim.js               Grupo B    batida, trancado, pontuação
+├── js/ui-controles.js      Grupo B    botões comprar/passar, mensagens, pontos, nova partida
+├── tests/helpers.js        G1
+├── tests/distribuicao.spec.js   Grupo G
+├── tests/jogadas.spec.js        Grupo G
+├── tests/compra.spec.js         Grupo B
+├── tests/fim-de-jogo.spec.js    Grupo B
+├── .github/workflows/testes.yml Grupo B
+├── babel.config.cjs        G1  só para os testes (Jest): ESM → CommonJS
+└── package.json            G1
+```
+
+## 3. Contrato de interface (o que os testes usam)
+
+### Elementos (`data-testid`)
+
+| data-testid | O que é |
+|---|---|
+| `btn-nova-partida` | Distribui as peças e começa |
+| `mao-j1` / `mao-j2` | Mão de cada jogador |
+| `peca-A-B` | Cada peça na mão, com A ≤ B (ex.: `peca-3-6`). Atributo `data-face="cima"\|"baixo"` |
+| `mesa` | Peças jogadas. Cada filho tem `data-peca` na orientação em que está na mesa (ex.: `6-6`, `6-3`, `3-1`) |
+| `ponta-esquerda` / `ponta-direita` | Número de cada ponta |
+| `escolha-lado` | Caixa com `btn-esquerda` e `btn-direita` |
+| `monte-qtd` | Peças no monte |
+| `vez` | `J1` ou `J2` |
+| `btn-comprar` / `btn-passar` | Comprar do monte / passar a vez |
+| `pontos-j1` / `pontos-j2` | Pontos marcados na partida |
+| `mensagem` | "Jogada inválida", "Jogador 1 venceu!", "Jogo trancado — Jogador 2 venceu!", "Empate" |
+
+### Parâmetros de URL
+
+| Parâmetro | Exemplo | Efeito |
+|---|---|---|
+| `j1` | `?j1=6-6,6-3,1-3,2-2,0-4,5-5,1-1` | Mão do J1 (qualquer quantidade) |
+| `j2` | `?j2=…` | Mão do J2 |
+| `monte` | `?monte=0-0,0-1` ou `?monte=` (vazio) | Monte, na ordem de compra |
+
+Se qualquer um dos três for usado, **só existem as peças listadas** (as outras ficam fora da partida). Assim dá para montar cenários pequenos. Com esses parâmetros, a partida **já começa ao abrir a página**, sem clicar em `btn-nova-partida`.
+
+Cenário fixo usado nos testes de jogada (fica no `tests/helpers.js`):
+`CENARIO_JOGADAS` = `?j1=6-6,1-3,0-0&j2=3-6,1-6,2-2&monte=` — J1 começa (tem 6-6).
+
+### Esclarecimentos da revisão (contrato)
+
+- Os parâmetros `j1`, `j2` e `monte` valem só para a partida que começa ao abrir a página. `btn-nova-partida` depois disso sorteia uma partida normal (7 + 7 + 14).
+- Peça bloqueada tem o atributo `disabled`.
+
+## 4. Divisão de tarefas
+
+> ⚠️ **Modo atual: somente testes.** A fase GREEN (implementar o jogo) está desativada até segunda ordem. As tarefas abaixo são de **escrever os casos de teste**; o código do jogo não é feito. Cada teste fica **falhando pelo motivo certo**.
+
+Cada tarefa segue o mesmo ciclo, **um caso de teste por vez**:
+
+1. Escrever o teste do TC só a partir da especificação (seções 1, 3 e 5), sem código do jogo.
+2. Rodar só ele (`npx jest tests/<arquivo>.spec.js -t "TC-XX-NN"`) e conferir que **falha pelo motivo certo**: asserção ou elemento não encontrado, e não erro do próprio teste.
+3. `npm run verificar` sem problemas → commit `test: TC-XX-NN <cenário>`.
+4. No fim da tarefa: revisão, atualizar a tabela de testes do README e abrir o Pull Request; o outro integrante revisa.
+
+Os arquivos de cada tarefa estão indicados na tabela abaixo.
+
+
+### Grupo G
+
+| Tarefa | Branch | Arquivos | Casos de teste |
+|---|---|---|---|
+| **G1** Setup: `package.json`, configuração do Jest no `package.json` + `babel.config.cjs`, `js/main.js` vazio, `.gitignore`, `index.html` esqueleto (elementos fixos da seção 3 **vazios**, sem texto nem atributos de estado), `tests/helpers.js` com `abrirJogo(params)` e `CENARIO_JOGADAS` | `tarefas/g1-setup` | index.html, js/main.js, config, tests/helpers.js | — |
+| **G2** 28 peças e distribuição | `tarefas/g2-distribuicao` | tests/distribuicao.spec.js | TC-DO-01, 02, 10 |
+| **G3** Quem começa | `tarefas/g3-quem-comeca` | tests/distribuicao.spec.js | TC-DO-03 a 05, 18, 19 |
+| **G4** Encaixar e girar peças, jogada inválida, alternar vez | `tarefas/g4-jogadas` | tests/jogadas.spec.js | TC-DO-06 a 08, 21 |
+| **G5** Escolher o lado | `tarefas/g5-lado` | tests/jogadas.spec.js | TC-DO-09, 20 |
+| **G6** Dicas: peças jogáveis e comprar | `tarefas/g6-dicas` | tests/dicas.spec.js | TC-DO-22, 23 |
+
+### Grupo B
+
+| Tarefa | Branch | Arquivos | Casos de teste |
+|---|---|---|---|
+| **B1** CI no GitHub Actions (`npm ci`, `npm run verificar`) + tabela de testes no README | `tarefas/b1-ci-readme` | .github/workflows, README.md | — |
+| **B2** Comprar do monte | `tarefas/b2-comprar` | tests/compra.spec.js | TC-DO-11, 12 |
+| **B3** Passar a vez | `tarefas/b3-passar` | tests/compra.spec.js | TC-DO-13 |
+| **B4** Batida e pontuação | `tarefas/b4-batida` | tests/fim-de-jogo.spec.js | TC-DO-14 |
+| **B5** Jogo trancado, empate e nova partida | `tarefas/b5-trancado` | tests/fim-de-jogo.spec.js | TC-DO-15 a 17 |
+
+## 5. Casos de teste (interface)
+
+### Grupo G — peças, início e jogadas
+
+| ID | Cenário | Parâmetros / passos | Resultado esperado |
+|---|---|---|---|
+| TC-DO-01 | Distribuição | Sem parâmetros, `btn-nova-partida` | `mao-j1` e `mao-j2` com 7 peças; `monte-qtd` = 14; `mesa` vazia |
+| TC-DO-02 | 28 peças sem repetir | Sem parâmetros. 20 vezes: nova partida, ler os `data-testid` das 14 peças das mãos | Todas de `0-0` a `6-6`, nenhuma repetida |
+| TC-DO-03 | Maior dupla começa | `j1=1-2,…` (sem 6-6), `j2=6-6,…` | `vez` = J2 |
+| TC-DO-04 | Dupla obrigatória | Cenário do TC-DO-03; J2 clica outra peça que não 6-6 | `mensagem` = "Jogada inválida"; mesa vazia. Clicar 6-6 → mesa = `6-6` |
+| TC-DO-05 | Sem duplas | `j1=5-6,0-1`, `j2=4-6,2-3` (nenhuma dupla) | `vez` = J1 (5-6 tem a maior soma); só 5-6 pode ser jogada primeiro |
+| TC-DO-06 | Encaixe | `CENARIO_JOGADAS`. J1 joga 6-6, J2 joga 3-6 | `mesa` = `6-6`, `6-3`; `ponta-esquerda` = 6, `ponta-direita` = 3; `vez` = J1 |
+| TC-DO-07 | Peça girada | Continuando o TC-DO-06: J1 joga 1-3 (só encaixa no 3) | Na mesa aparece `3-1`; `ponta-direita` = 1; não aparece `escolha-lado` |
+| TC-DO-08 | Jogada inválida | Depois do TC-DO-06 (pontas 6 e 3), J1 clica 0-0 | `mensagem` = "Jogada inválida"; 0-0 continua na mão; `vez` continua J1 |
+| TC-DO-09 | Escolher o lado | Depois do TC-DO-07 (pontas 6 e 1), J2 clica 1-6 | `escolha-lado` aparece; `btn-esquerda` → peça entra à esquerda como `1-6` e `ponta-esquerda` = 1 |
+| TC-DO-10 | Mão escondida | Nova partida | Peças do jogador da vez `data-face="cima"`, do outro `"baixo"`; depois de jogar, invertem |
+| TC-DO-18 | Dupla vence soma | `j1=1-1,0-2`, `j2=5-6,0-3`, `monte=` (J2 tem a maior soma, mas só J1 tem dupla) | `vez` = J1; J1 joga 1-1 → mesa = `1-1` |
+| TC-DO-19 | Maior dupla entre várias | `j1=3-3,5-6`, `j2=5-5,1-2`, `monte=` (J1 tem a maior soma; J2, a maior dupla) | `vez` = J2; 1-2 → "Jogada inválida"; 5-5 → mesa = `5-5` |
+| TC-DO-20 | Escolher o lado direito | Depois do TC-DO-07 (pontas 6 e 1), J2 clica 1-6 e `btn-direita` | Mesa = `6-6`, `6-3`, `3-1`, `1-6`; `ponta-direita` = 6 |
+| TC-DO-21 | Girar na ponta esquerda | `j1=6-6,2-6,0-0`, `j2=3-6,2-5,1-1`, `monte=`: 6-6, 3-6, 2-6, 2-5 | Mesa = `5-2`, `2-6`, `6-6`, `6-3`; `ponta-esquerda` = 5 |
+| TC-DO-22 | Peças jogáveis destacadas | `CENARIO_JOGADAS`; J1 joga 6-6 | Antes: só 6-6 de J1 marcada (saída obrigatória). Depois: 3-6 e 1-6 de J2 marcadas, 2-2 não; nada marcado em J1 |
+| TC-DO-23 | Sugerir comprar | `j1=6-6,5-5`, `j2=0-1,2-3`, `monte=0-0,1-2,4-6`; J1 joga 6-6 | Na vez de J1, `btn-comprar` sem sugestão; na de J2, nenhuma peça marcada e `btn-comprar` com `data-sugerido="true"` |
+
+### Grupo B — compra, passe e fim da partida
+
+| ID | Cenário | Parâmetros / passos | Resultado esperado |
+|---|---|---|---|
+| TC-DO-11 | Comprar só sem jogada | `j1=6-6,6-1`, `j2=0-1,6-2`, `monte=3-4`. J1 joga 6-6 | Para J2 (tem 6-2) `btn-comprar` desabilitado |
+| TC-DO-12 | Comprar até conseguir jogar | `j1=6-6,5-5`, `j2=0-1,2-3`, `monte=0-0,1-2,4-6`. J1 joga 6-6 | J2: `btn-comprar` habilitado; comprar 3 vezes → `monte-qtd` = 0 e 4-6 na mão; depois de pegar 4-6, `btn-comprar` desabilita |
+| TC-DO-13 | Passar | `j1=6-6,6-5`, `j2=0-1`, `monte=` (vazio). J1 joga 6-6 | J2: `btn-comprar` desabilitado, `btn-passar` habilitado; passar → `vez` = J1 |
+| TC-DO-14 | Batida | `j1=6-6,6-3`, `j2=6-1,2-4,0-0`, `monte=`. J1 joga 6-6, J2 joga 6-1, J1 joga 6-3 | `mensagem` = "Jogador 1 venceu!"; `pontos-j1` = 6 (2+4+0+0); peças travadas |
+| TC-DO-15 | Jogo trancado | `j1=6-6,0-1`, `j2=2-3,4-4`, `monte=`. J1 joga 6-6; ninguém tem 6 | `mensagem` = "Jogo trancado — Jogador 1 venceu!" (1 ponto contra 13); `pontos-j1` = 13 |
+| TC-DO-16 | Trancado com empate | `j1=6-6,0-4`, `j2=1-3,2-2`, `monte=`. J1 joga 6-6 | Somas 4 × 4 (1+3 = 4; 2+2 = 4); `mensagem` = "Empate"; ninguém pontua |
+| TC-DO-17 | Nova partida | Depois do TC-DO-14, clicar `btn-nova-partida` (sem parâmetros) | 7 peças para cada um, monte 14, mesa vazia, `mensagem` vazia |
+
+> **Ajuste da matriz de cobertura:** TC-DO-14 a 16 usam `test.each` também com o Jogador 2 vencendo ("Jogador 2 venceu!", `pontos-j2`).
+
+## 6. Fluxo de trabalho no Git
+
+Registre as alterações desta versão na conta de quem as realizou.
+
+## 7. Definição de pronto
+
+O desafio só está pronto para entrega quando:
+
+- [ ] Todos os casos de teste da seção 5 escritos em `tests/`, com o ID no título
+- [ ] `npm run verificar:completo` sem problemas: todos os TCs têm teste, e todos **falham pelo motivo certo** (a fase GREEN está desativada)
+- [ ] Nenhum código do jogo em `js/` (só o `js/main.js` vazio)
+- [ ] README com: colaboradores, como rodar, **funcionamento dos casos de teste** (tabela ID → arquivo → o que verifica) — tarefa B1
+- [ ] CI (GitHub Actions rodando `npm run verificar`) verde na `main` — tarefa B1
+- [ ] Nome do repositório exatamente `desafio_teste_domino`
